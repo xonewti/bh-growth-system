@@ -14,7 +14,7 @@ def connect_spreadsheet():
         creds_info = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_dict(creds_info, scope)
         client = gspread.authorize(creds)
-        sheet = client.open("법환초_성장데이터시스템") 
+        sheet = client.open_by_key("1SU5O5K40TMLaBWdeViEKGCes6QT9y6qykYhkNzGF5Ew")
         return sheet
     except Exception as e:
         st.error(f"시트 연결 오류: {e}")
