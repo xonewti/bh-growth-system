@@ -142,24 +142,34 @@ if sheet:
                 full_df['시간'] = pd.to_datetime(full_df['시간'], format='mixed')
                 class_df = full_df[full_df['반'] == class_sel].copy()
                 
-                # [선생님1] 개요: 학년 평균 vs 학급 평균
-                st.subheader(f"📍 {grade_sel}학년 전체 vs {class_sel}반 비교")
+                # [선생님1] 개요: 학년 평균 vs 학급 평균 (대영역별 요약)
+                st.subheader(f"📍 {grade_sel}학년 전체 vs {class_sel}반 비교 (대영역 평균)")
                 col1, col2 = st.columns(2)
                 
-                # 계산 로직
-                target_cols = [f'성장{i}' for i in range(1,6)] + [f'공감{i}' for i in range(1,6)] + [f'행복{i}' for i in range(1,6)]
-                for c in target_cols: 
-                    full_df[c] = pd.to_numeric(full_df[c], errors='coerce')
-                    class_df[c] = pd.to_numeric(class_df[c], errors='coerce')
+                # 계산 로직: 15개 항목을 3개 영역으로 평균 내기
+                for df_tmp in [full_df, class_df]:
+                    df_tmp['성장_avg'] = df_tmp[[f'성장{i}' for i in range(1,6)]].mean(axis=1)
+                    df_tmp['공감_avg'] = df_tmp[[f'공감{i}' for i in range(1,6)]].mean(axis=1)
+                    df_tmp['행복_avg'] = df_tmp[[f'행복{i}' for i in range(1,6)]].mean(axis=1)
                 
-                grade_avg = full_df[target_cols].mean()
-                class_avg = class_df[target_cols].mean()
+                # 그래프용 데이터 생성
+                categories = ['성장 평균', '공감 평균', '행복 평균']
+                grade_vals = [full_df['성장_avg'].mean(), full_df['공감_avg'].mean(), full_df['행복_avg'].mean()]
+                class_vals = [class_df['성장_avg'].mean(), class_df['공감_avg'].mean(), class_df['행복_avg'].mean()]
                 
                 with col1:
-                    fig_grade = px.bar(x=target_cols, y=grade_avg, title=f"{grade_sel}학년 전체 평균")
+                    fig_grade = px.bar(x=categories, y=grade_vals, 
+                                     title=f"{grade_sel}학년 전체 평균",
+                                     labels={'x': '영역', 'y': '평균 점수'})
+                    fig_grade.update_layout(yaxis=dict(range=[1, 5])) # 세로축 고정
                     st.plotly_chart(fig_grade, use_container_width=True)
+                    
                 with col2:
-                    fig_class = px.bar(x=target_cols, y=class_avg, title=f"{class_sel}반 전체 평균", color_discrete_sequence=['orange'])
+                    fig_class = px.bar(x=categories, y=class_vals, 
+                                     title=f"{class_sel}반 전체 평균",
+                                     labels={'x': '영역', 'y': '평균 점수'},
+                                     color_discrete_sequence=['orange'])
+                    fig_class.update_layout(yaxis=dict(range=[1, 5])) # 세로축 고정
                     st.plotly_chart(fig_class, use_container_width=True)
 
                 # [선생님3] 주간 평균 (막대)
