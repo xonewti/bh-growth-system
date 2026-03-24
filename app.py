@@ -9,12 +9,16 @@ from datetime import datetime
 # --- 1. 기본 설정 및 구글 시트 연결 ---
 def connect_spreadsheet():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # Secrets에서 정보 가져오기
     try:
         creds_info = st.secrets["gcp_service_account"]
-        creds = ServiceAccountCredentials.from_json_dict(creds_info, scope)
+        
+        # [수정 전] creds = ServiceAccountCredentials.from_json_dict(creds_info, scope)
+        # [수정 후] 아래 이름으로 정확히 바꿔주세요!
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
+        
         client = gspread.authorize(creds)
-        sheet = client.open_by_key("1SU5O5K40TMLaBWdeViEKGCes6QT9y6qykYhkNzGF5Ew")
+        # 시트 ID로 연결하는 방식을 그대로 유지하세요.
+        sheet = client.open_by_key("1SU5O5K40TMLaBWdeViEKGCes6QT9y6qykYhkNzGF5Ew") 
         return sheet
     except Exception as e:
         st.error(f"시트 연결 오류: {e}")
