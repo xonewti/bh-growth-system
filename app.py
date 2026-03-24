@@ -1,3 +1,14 @@
+def connect_spreadsheet():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    
+    # [보안 코드] 파일 대신 스트림릿 금고(Secrets)에서 직접 열쇠를 꺼냅니다.
+    creds_info = st.secrets["gcp_service_account"]
+    creds = ServiceAccountCredentials.from_json_dict(creds_info, scope)
+    
+    client = gspread.authorize(creds)
+    sheet = client.open("법환초_성장데이터시스템") 
+    return sheet
+
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
