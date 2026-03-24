@@ -3,5 +3,3 @@ gspread
 oauth2client
 pandas
 plotly
-wordcloud
-matplotlib
