@@ -15,7 +15,7 @@ def connect_spreadsheet():
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
         client = gspread.authorize(creds)
         # 선생님의 실제 구글 시트 ID를 아래에 넣어주세요
-        sheet = client.open_by_key("여기에_시트_ID를_넣으세요") 
+        sheet = client.open_by_key("1SU5O5K40TMLaBWdeViEKGCes6QT9y6qykYhkNzGF5Ew") 
         return sheet
     except Exception as e:
         st.error(f"시트 연결 오류: {e}")
