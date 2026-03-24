@@ -142,48 +142,53 @@ if sheet:
                 full_df['시간'] = pd.to_datetime(full_df['시간'], format='mixed')
                 class_df = full_df[full_df['반'] == class_sel].copy()
                 
-                # [선생님1] 개요: 학년 평균 vs 학급 평균 (대영역별 요약)
-                st.subheader(f"📍 {grade_sel}학년 전체 vs {class_sel}반 비교 (대영역 평균)")
+                # 1. 데이터 숫자 변환 및 대영역 평균 계산
+                target_cols = [f'성장{i}' for i in range(1,6)] + [f'공감{i}' for i in range(1,6)] + [f'행복{i}' for i in range(1,6)]
+                for c in target_cols: 
+                    full_df[c] = pd.to_numeric(full_df[c], errors='coerce')
+                    class_df[c] = pd.to_numeric(class_df[c], errors='coerce')
+
+                # 학년/학급별 대영역 평균 도출
+                def get_summary_df(input_df):
+                    s_avg = input_df[[f'성장{i}' for i in range(1,6)]].mean(axis=1).mean()
+                    e_avg = input_df[[f'공감{i}' for i in range(1,6)]].mean(axis=1).mean()
+                    h_avg = input_df[[f'행복{i}' for i in range(1,6)]].mean(axis=1).mean()
+                    return pd.DataFrame({'영역': ['성장 평균', '공감 평균', '행복 평균'], '점수': [s_avg, e_avg, h_avg]})
+
+                grade_summary = get_summary_df(full_df)
+                class_summary = get_summary_df(class_df)
+
+                # 2. [선생님1] 개요: 학년 vs 학급 (한 줄에 두 개)
+                st.subheader(f"📍 {grade_sel}학년 전체 vs {class_sel}반 비교 (대영역)")
                 col1, col2 = st.columns(2)
                 
-                # 계산 로직: 15개 항목을 3개 영역으로 평균 내기
-                for df_tmp in [full_df, class_df]:
-                    df_tmp['성장_avg'] = df_tmp[[f'성장{i}' for i in range(1,6)]].mean(axis=1)
-                    df_tmp['공감_avg'] = df_tmp[[f'공감{i}' for i in range(1,6)]].mean(axis=1)
-                    df_tmp['행복_avg'] = df_tmp[[f'행복{i}' for i in range(1,6)]].mean(axis=1)
-                
-                # 그래프용 데이터 생성
-                categories = ['성장 평균', '공감 평균', '행복 평균']
-                grade_vals = [full_df['성장_avg'].mean(), full_df['공감_avg'].mean(), full_df['행복_avg'].mean()]
-                class_vals = [class_df['성장_avg'].mean(), class_df['공감_avg'].mean(), class_df['행복_avg'].mean()]
-                
                 with col1:
-                    fig_grade = px.bar(x=categories, y=grade_vals, 
-                                     title=f"{grade_sel}학년 전체 평균",
-                                     labels={'x': '영역', 'y': '평균 점수'})
-                    fig_grade.update_layout(yaxis=dict(range=[1, 5])) # 세로축 고정
+                    fig_grade = px.bar(grade_summary, x='영역', y='점수', title=f"{grade_sel}학년 전체 평균", range_y=[1,5])
+                    fig_grade.update_traces(marker_color='royalblue')
                     st.plotly_chart(fig_grade, use_container_width=True)
-                    
                 with col2:
-                    fig_class = px.bar(x=categories, y=class_vals, 
-                                     title=f"{class_sel}반 전체 평균",
-                                     labels={'x': '영역', 'y': '평균 점수'},
-                                     color_discrete_sequence=['orange'])
-                    fig_class.update_layout(yaxis=dict(range=[1, 5])) # 세로축 고정
+                    fig_class = px.bar(class_summary, x='영역', y='점수', title=f"{class_sel}반 전체 평균", range_y=[1,5])
+                    fig_class.update_traces(marker_color='orange')
                     st.plotly_chart(fig_class, use_container_width=True)
 
-                # [선생님3] 주간 평균 (막대)
-                st.subheader("📅 우리반 주간 세부 덕목 현황")
+                # 3. [선생님3] 우리반 주간 세부 덕목 (막대)
+                st.subheader("📅 우리반 주간 세부 덕목 현황 (이번 주)")
                 class_df['주차'] = class_df['시간'].dt.isocalendar().week
                 recent_week = class_df[class_df['주차'] == class_df['주차'].max()]
                 week_avg = recent_week[target_cols].mean().reset_index()
                 week_avg['덕목명'] = week_avg['index'].map(virtues)
-                fig_week = px.bar(week_avg, x='덕목명', y=0, title="이번 주 세부 덕목 평균")
+                fig_week = px.bar(week_avg, x='덕목명', y=0, title="이번 주 세부 항목별 평균", range_y=[1,5])
                 st.plotly_chart(fig_week, use_container_width=True)
 
-                # [선생님4] 월간 평균 (꺾은선)
+                # 4. [선생님4] 우리반 월간 세부 덕목 (꺾은선)
                 st.subheader("📈 우리반 월간 세부 덕목 추이")
                 class_df['월'] = class_df['시간'].dt.strftime('%m월')
-                mon_detail = class_df.groupby('월')[target_cols].mean().T
-                fig_mon_line = px.line(mon_detail, title="세부 덕목 월별 변화 추이")
+                # 세부 항목별 월간 평균 계산 및 이름 매핑
+                mon_detail = class_df.groupby('월')[target_cols].mean().reset_index()
+                mon_melted = mon_detail.melt(id_vars='월', var_name='구분', value_name='점수')
+                mon_melted['덕목명'] = mon_melted['구분'].map(virtues)
+                
+                fig_mon_line = px.line(mon_melted, x='월', y='점수', color='덕목명', markers=True, range_y=[1,5])
+                fig_mon_line.update_layout(yaxis=dict(dtick=0.5))
                 st.plotly_chart(fig_mon_line, use_container_width=True)
+                
