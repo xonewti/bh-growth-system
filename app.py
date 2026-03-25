@@ -6,57 +6,40 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 
-# --- 1. 학년별 데이터 설정 (여기를 실제 값으로 채워주세요!) ---
+# --- 1. 학년별 설정 (여기에 실제 ID와 URL을 꼭 넣어주세요!) ---
 GRADE_CONFIG = {
-    3: {
-        "sheet_id": "1qxJcwM6igCcB4rjChzkCQmuyx8luhO15PPtEBCtZjHw",
-        "form_url": "https://docs.google.com/forms/d/e/1FAIpQLScA6zKWFxIYhHzYq-pEOvXK-KLAV3enQ4Uz80NuM2gCX2vqxA/viewform?usp=header"
-    },
-    4: {
-        "sheet_id": "4학년_구글시트_ID_입력",
-        "form_url": "4학년_구글설문지_링크_입력"
-    },
-    5: {
-        "sheet_id": "5학년_구글시트_ID_입력",
-        "form_url": "5학년_구글설문지_링크_입력"
-    },
-    6: {
-        "sheet_id": "6학년_구글시트_ID_입력",
-        "form_url": "6학년_구글설문지_링크_입력"
-    }
+    3: {"sheet_id": "3학년_시트_ID", "form_url": "3학년_설문지_URL"},
+    4: {"sheet_id": "4학년_시트_ID", "form_url": "4학년_설문지_URL"},
+    5: {"sheet_id": "5학년_시트_ID", "form_url": "5학년_설문지_URL"},
+    6: {"sheet_id": "6학년_시트_ID", "form_url": "6학년_설문지_URL"}
 }
 
-# --- 2. 구글 시트 연결 함수 ---
 def connect_spreadsheet(grade):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     try:
         creds_info = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
         client = gspread.authorize(creds)
-        
-        sheet_id = GRADE_CONFIG[grade]["sheet_id"]
-        sheet = client.open_by_key(sheet_id)
+        sheet = client.open_by_key(GRADE_CONFIG[grade]["sheet_id"])
         return sheet
     except Exception as e:
-        st.error(f"{grade}학년 시트 연결 실패. ID와 공유 설정을 확인하세요.")
+        st.error(f"시트 연결 실패: {e}")
         return None
 
-# 설정값 캐싱 (10분)
 @st.cache_data(ttl=600)
 def get_settings(_sheet, grade):
     try:
-        settings_sheet = _sheet.worksheet("Settings")
-        records = settings_sheet.get_all_records()
-        # Settings 시트에는 여전히 '학년' 열이 있어야 필터링이 가능합니다.
+        ws = _sheet.worksheet("Settings")
+        records = ws.get_all_records()
         return {r['구분']: r['덕목이름'] for r in records if str(r['학년']) == str(grade)}
-    except:
-        return {}
+    except: return {}
 
-# --- 3. 시각화 함수 ---
 def create_radar(data_df, cat_name, virtues_dict):
     cols = [f'{cat_name}{i}' for i in range(1,6)]
-    v_names = [virtues_dict.get(c, c) for c in cols]
+    # 만약 데이터에 해당 컬럼이 없으면 빈 그래프 반환
+    if not all(c in data_df.columns for c in cols): return None
     
+    v_names = [virtues_dict.get(c, c) for c in cols]
     current_month = datetime.now().month
     this_month_df = data_df[data_df['시간'].dt.month == current_month].copy()
     
@@ -66,95 +49,74 @@ def create_radar(data_df, cat_name, virtues_dict):
     for idx, (index, row) in enumerate(this_month_df.sort_values('시간').iterrows()):
         r_values = [row[c] for c in cols]
         r_values.append(r_values[0])
-        fig.add_trace(go.Scatterpolar(
-            r=r_values, theta=v_names + [v_names[0]], fill='toself', name=f"{idx+1}회차"
-        ))
+        fig.add_trace(go.Scatterpolar(r=r_values, theta=v_names + [v_names[0]], fill='toself', name=f"{idx+1}회차"))
     
-    fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[1, 5], dtick=1)),
-        title=f"이번 달 {cat_name} 세부 분석", height=400
-    )
+    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[1, 5])), title=f"{cat_name} 분석", height=400)
     return fig
 
-# --- 메인 앱 시작 ---
+# --- 메인 앱 ---
 st.set_page_config(page_title="법환초 성장 시스템", layout="wide")
-
 st.sidebar.title("🏫 법환초 성장 시스템")
 grade = st.sidebar.selectbox("나의 학년", [3, 4, 5, 6])
-menu = st.sidebar.radio("메뉴 선택", ["🌱 기록 및 조회", "🔐 선생님 관리"])
+menu = st.sidebar.radio("메뉴", ["🌱 기록 및 조회", "🔐 선생님 관리"])
 
 sheet = connect_spreadsheet(grade)
-
 if sheet:
     virtues = get_settings(sheet, grade)
 
     if menu == "🌱 기록 및 조회":
         st.title(f"🌱 {grade}학년 성장 기록장")
-        
-        t1, t2 = st.tabs(["📝 기록하기 (설문지)", "📈 나의 성장 데이터"])
+        t1, t2 = st.tabs(["📝 기록하기", "📈 나의 데이터"])
 
         with t1:
-            st.info("기록은 구글 설문지를 통해 안전하게 저장됩니다. 아래 버튼을 눌러주세요!")
-            form_url = GRADE_CONFIG[grade]["form_url"]
-            st.link_button(f"🚀 {grade}학년 성장 기록하러 가기", form_url, use_container_width=True)
+            st.link_button(f"🚀 {grade}학년 설문지 열기", GRADE_CONFIG[grade]["form_url"], use_container_width=True)
 
         with t2:
-            st.subheader("🔍 내 데이터 조회하기")
-            col_id, col_name = st.columns(2)
-            with col_id: class_num = st.selectbox("반", [1, 2], key="std_class")
-            with col_name: student_name = st.text_input("이름을 입력하세요")
-            student_id = st.number_input("번호", 1, 40, 1)
+            col1, col2, col3 = st.columns(3)
+            with col1: class_num = st.selectbox("반", [1, 2])
+            with col2: student_name = st.text_input("이름")
+            with col3: student_id = st.number_input("번호", 1, 40, 1)
 
             if student_name:
                 try:
                     ws = sheet.worksheet(f"{class_num}반")
                     data = ws.get_all_values()
+                    df = pd.DataFrame(data[1:], columns=data[0])
                     
-                    if len(data) > 1:
-                        df = pd.DataFrame(data[1:], columns=data[0])
-                        
-                        # 컬럼명 처리 (타임스탬프 -> 시간)
-                        if '타임스탬프' in df.columns:
-                            df = df.rename(columns={'타임스탬프': '시간'})
-                        
-                        df['시간'] = pd.to_datetime(df['시간'], errors='coerce')
-                        df['번호'] = pd.to_numeric(df['번호'], errors='coerce')
-                        
-                        # 점수 데이터 숫자 변환
-                        score_cols = [c for c in df.columns if any(x in c for x in ['성장', '공감', '행복'])]
-                        for col in score_cols:
-                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                    # --- [핵심: 열 이름 매칭 로직] ---
+                    new_cols = {}
+                    for col in df.columns:
+                        if '타임스탬프' in col: new_cols[col] = '시간'
+                        for p in ['성장', '공감', '행복']:
+                            for i in range(1, 6):
+                                if f"{p}{i}" in col: new_cols[col] = f"{p}{i}"
+                    df = df.rename(columns=new_cols)
+                    
+                    # 데이터 타입 변환
+                    df['시간'] = pd.to_datetime(df['시간'], errors='coerce')
+                    df['번호'] = pd.to_numeric(df['번호'], errors='coerce')
+                    for c in df.columns:
+                        if any(p in c for p in ['성장', '공감', '행복']):
+                            df[c] = pd.to_numeric(df[c], errors='coerce')
 
-                        # 필터링
-                        my_df = df[(df['번호'] == student_id) & (df['이름'] == student_name)].copy()
+                    my_df = df[(df['번호'] == student_id) & (df['이름'] == student_name)].copy()
+
+                    if not my_df.empty:
+                        st.success(f"{student_name} 학생 확인되었습니다.")
+                        # 그래프 출력
+                        cols = st.columns(3)
+                        for i, cat in enumerate(['성장', '공감', '행복']):
+                            with cols[i]:
+                                fig = create_radar(my_df, cat, virtues)
+                                if fig: st.plotly_chart(fig, use_container_width=True)
                         
-                        if not my_df.empty:
-                            st.success(f"✅ {student_name} 학생의 기록을 찾았습니다!")
-                            
-                            # 1. 선생님 피드백 (U열 - 21번째 열)
-                            if '선생님피드백' in my_df.columns:
-                                fb_df = my_df[my_df['선생님피드백'].str.strip() != ""].sort_values('시간', ascending=False)
-                                if not fb_df.empty:
-                                    with st.expander("💬 선생님의 따뜻한 한마디", expanded=True):
-                                        for _, r in fb_df.iterrows():
-                                            st.info(f"**[{r['시간'].strftime('%m월 %d일')}]** {r['선생님피드백']}")
-                            
-                            # 2. 방사형 그래프
-                            st.divider()
-                            c1, c2, c3 = st.columns(3)
-                            with c1: 
-                                fig1 = create_radar(my_df, '성장', virtues)
-                                if fig1: st.plotly_chart(fig1, use_container_width=True)
-                            with c2:
-                                fig2 = create_radar(my_df, '공감', virtues)
-                                if fig2: st.plotly_chart(fig2, use_container_width=True)
-                            with c3:
-                                fig3 = create_radar(my_df, '행복', virtues)
-                                if fig3: st.plotly_chart(fig3, use_container_width=True)
-                        else:
-                            st.warning("데이터가 없습니다. 반, 번호, 이름을 다시 확인해 주세요.")
-                except Exception as e:
-                    st.error(f"상세 에러 내용: {e}")
+                        # 피드백 출력
+                        if '선생님피드백' in df.columns:
+                            fb_df = my_df[my_df['선생님피드백'].str.strip() != ""].sort_values('시간', ascending=False)
+                            for _, r in fb_df.iterrows():
+                                st.info(f"**[{r['시간'].strftime('%m/%d')}]** {r['선생님피드백']}")
+                    else: st.warning("데이터를 찾을 수 없습니다.")
+                except Exception as e: st.error(f"오류 발생: {e}")
 
     elif menu == "🔐 선생님 관리":
         st.title(f"🔐 {grade}학년 관리자 페이지")
