@@ -126,38 +126,37 @@ if sheet:
                             my_df = df[(df['번호'] == s_id) & (df['이름'] == s_name)].copy()
 
                             if not my_df.empty:
-                                st.success(f"✅ {s_name} 학생 확인되었습니다.")
-                                for cat in ['성장', '공감', '행복']:
-                                    st.subheader(f"📍 {cat} 영역 분석")
-                                    l, r = st.columns(2)
-                                    with l: st.plotly_chart(create_radar(my_df, cat, virtue_mapping, 'monthly'), use_container_width=True)
-                                    with r: st.plotly_chart(create_radar(my_df, cat, virtue_mapping, 'weekly'), use_container_width=True)
-                                
-                                # --- [고정 레이아웃] 나의 성장 기록 히스토리 ---
+                                # --- [날짜만 표시하도록 수정된 섹션] ---
                                 st.divider()
                                 st.subheader("📝 나의 성장 기록 히스토리")
                                 
-                                # 제목 고정
+                                # 상단 제목 영역 고정
                                 h_col1, h_col2 = st.columns(2)
                                 with h_col1: st.info("🙋‍♂️ **내가 쓴 반성의 글**")
                                 with h_col2: st.success("👨‍🏫 **선생님의 피드백**")
 
+                                # 데이터 최신순 정렬
                                 history_df = my_df.sort_values('시간', ascending=False)
+                                
                                 for _, row in history_df.iterrows():
-                                    # 24시간제 시간 표시
-                                    d_time = row['시간'].strftime('%Y-%m-%d %H:%M')
-                                    st.caption(f"⏱️ 기록 시간: {d_time}")
+                                    # [핵심 수정] 시간 제외, 날짜만 표시 (예: 2024-03-26)
+                                    display_date = row['시간'].strftime('%Y-%m-%d')
+                                    st.caption(f"📅 기록 날짜: {display_date}")
                                     
                                     b_col1, b_col2 = st.columns(2)
                                     with b_col1:
                                         content = str(row.get('반성', '내용 없음')).strip()
-                                        st.markdown(f'<div style="background-color:#f0f2f6; padding:15px; border-radius:10px;">{content}</div>', unsafe_allow_html=True)
+                                        # 디자인 유지: 회색 박스
+                                        st.markdown(f'<div style="background-color:#f0f2f6; padding:15px; border-radius:10px; min-height:60px;">{content}</div>', unsafe_allow_html=True)
+                                    
                                     with b_col2:
                                         fb = str(row.get('피드백', '')).strip()
-                                        fb_display = fb if fb and fb not in ['None', 'nan', '', '0'] else "❤️"
-                                        st.markdown(f'<div style="background-color:#e8f4ea; padding:15px; border-radius:10px;">{fb_display}</div>', unsafe_allow_html=True)
+                                        fb_display = fb if fb and fb not in ['None', 'nan', '', '0'] else "*(선생님이 확인 중입니다)*"
+                                        # 디자인 유지: 녹색 박스
+                                        st.markdown(f'<div style="background-color:#e8f4ea; padding:15px; border-radius:10px; min-height:60px;">{fb_display}</div>', unsafe_allow_html=True)
+                                    
                                     st.write("") 
-                                    st.divider()
+                                    st.divider() # 기록 간 구분선      
                             else:
                                 st.warning(f"'{s_name}' 학생의 {s_id}번 데이터를 찾을 수 없습니다.")
                         else:
