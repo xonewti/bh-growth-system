@@ -154,7 +154,7 @@ if sheet:
                                         st.markdown(f'<div style="background-color:#f0f2f6; padding:15px; border-radius:10px;">{content}</div>', unsafe_allow_html=True)
                                     with b_col2:
                                         fb = str(row.get('피드백', '')).strip()
-                                        fb_display = fb if fb and fb not in ['None', 'nan', '', '0'] else "*(확인 중)*"
+                                        fb_display = fb if fb and fb not in ['None', 'nan', '', '0'] else "❤️"
                                         st.markdown(f'<div style="background-color:#e8f4ea; padding:15px; border-radius:10px;">{fb_display}</div>', unsafe_allow_html=True)
                                     st.write("") 
                                     st.divider()
