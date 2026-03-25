@@ -8,8 +8,8 @@ import re
 
 # --- [고정] 학년별 설정 ---
 GRADE_CONFIG = {
-    3: {"sheet_id": "1qxJcwM6igCcB4rjChzkCQmuyx8luhO15PPtEBCtZjHw", "form_url": "YOUR_FORM_URL_3"},
-    4: {"sheet_id": "YOUR_SHEET_ID_4", "form_url": "https://forms.gle/EyrzKRutz3tJVqpb8"},
+    3: {"sheet_id": "1qxJcwM6igCcB4rjChzkCQmuyx8luhO15PPtEBCtZjHw", "form_url": "https://forms.gle/EyrzKRutz3tJVqpb8"},
+    4: {"sheet_id": "YOUR_SHEET_ID_4", "form_url": "YOUR_FORM_URL_4"},
     5: {"sheet_id": "YOUR_SHEET_ID_5", "form_url": "YOUR_FORM_URL_5"},
     6: {"sheet_id": "YOUR_SHEET_ID_6", "form_url": "YOUR_FORM_URL_6"}
 }
@@ -41,18 +41,12 @@ def create_radar(df, cat_name, virtues_dict, mode='weekly'):
         curr_m = datetime.now().month
         m_df = df[df['시간'].dt.month == curr_m]
         if m_df.empty: m_df = df
-        r_vals = []
-        for c in cols:
-            try: r_vals.append(m_df[c].astype(float).mean())
-            except: r_vals.append(0)
+        r_vals = [m_df[c].astype(float).mean() for c in cols if c in m_df.columns]
         title = f"📅 {curr_m}월 나의 평균"
         color = "rgba(100, 149, 237, 0.6)"
     else:
         recent = df.sort_values('시간').iloc[-1]
-        r_vals = []
-        for c in cols:
-            try: r_vals.append(float(recent[c]))
-            except: r_vals.append(0)
+        r_vals = [float(recent[c]) for c in cols if c in recent.index]
         title = "🚀 이번 주의 나의 모습"
         color = "rgba(255, 99, 132, 0.8)"
 
@@ -67,6 +61,7 @@ def create_radar(df, cat_name, virtues_dict, mode='weekly'):
 st.set_page_config(page_title="법환초 성장 시스템", layout="wide")
 st.sidebar.title("🏫 법환초 성장 시스템")
 menu = st.sidebar.radio("메뉴 선택", ["🌱 학생 기록 및 데이터 조회", "🔐 선생님 관리"])
+st.sidebar.divider()
 selected_grade = st.sidebar.selectbox("나의 학년", [3, 4, 5, 6])
 selected_class = st.sidebar.selectbox("나의 반", [1, 2])
 
@@ -96,11 +91,9 @@ if sheet:
                     raw_data = ws.get_all_values()
                     
                     if len(raw_data) > 1:
-                        # [복구] 1행(index 0)을 헤더로 사용
                         header = raw_data[0] 
                         df = pd.DataFrame(raw_data[1:], columns=header)
                         
-                        # [매칭] 열 제목 정규화
                         new_col_map = {}
                         for original_col in df.columns:
                             clean = re.sub(r'[^가-힣a-zA-Z0-9]', '', original_col)
@@ -116,7 +109,6 @@ if sheet:
                         
                         df = df.rename(columns=new_col_map)
 
-                        # [날짜] 오전/오후 처리
                         def parse_korean_date(date_str):
                             try:
                                 d_str = str(date_str).replace("오전", "AM").replace("오후", "PM")
@@ -124,7 +116,6 @@ if sheet:
                             except: return pd.to_datetime(date_str, errors='coerce')
 
                         if '번호' in df.columns and '이름' in df.columns:
-                            # 번호를 정수형 문자열로 통일 (2.0 -> 2)
                             df['번호'] = df['번호'].apply(lambda x: str(int(float(x))) if str(x).strip() else "")
                             df['이름'] = df['이름'].astype(str).str.strip()
                             df['시간'] = df['시간'].apply(parse_korean_date)
@@ -133,58 +124,43 @@ if sheet:
                             s_id, s_name = str(int(student_id_in)), student_name_in.strip()
                             my_df = df[(df['번호'] == s_id) & (df['이름'] == s_name)].copy()
 
-                        # --- [나의 데이터 조회 탭] 그래프 이후 섹션 코드 ---
-                        
-                        if not my_df.empty:
-                            st.success(f"✅ {s_name} 학생 확인되었습니다.")
-                            
-                            # 1. [고정] 영역별 방사형 그래프 (한 줄에 2개)
-                            for cat in ['성장', '공감', '행복']:
-                                st.markdown(f"#### 📍 {cat} 영역 분석")
-                                l_col, r_col = st.columns(2)
+                            if not my_df.empty:
+                                st.success(f"✅ {s_name} 학생 확인되었습니다.")
+                                for cat in ['성장', '공감', '행복']:
+                                    st.subheader(f"📍 {cat} 영역 분석")
+                                    l, r = st.columns(2)
+                                    with l:
+                                        fig_m = create_radar(my_df, cat, virtue_mapping, 'monthly')
+                                        if fig_m: st.plotly_chart(fig_m, use_container_width=True)
+                                    with r:
+                                        fig_w = create_radar(my_df, cat, virtue_mapping, 'weekly')
+                                        if fig_w: st.plotly_chart(fig_w, use_container_width=True)
                                 
-                                with l_col:
-                                    fig_m = create_radar(my_df, cat, virtue_mapping, 'monthly')
-                                    if fig_m: 
-                                        st.plotly_chart(fig_m, use_container_width=True, key=f"{cat}_monthly")
-                                with r_col:
-                                    fig_w = create_radar(my_df, cat, virtue_mapping, 'weekly')
-                                    if fig_w: 
-                                        st.plotly_chart(fig_w, use_container_width=True, key=f"{cat}_weekly")
-                            
-                            st.divider()
-                        
-                            # 2. [수정] 나의 다짐과 선생님의 한마디 (최신순 정렬)
-                            st.subheader("📝 나의 다짐과 선생님의 한마디")
-                            
-                            # 가장 최근 기록 가져오기
-                            latest = my_df.sort_values('시간', ascending=False).iloc[0]
-                            
-                            # 날짜 예쁘게 표시
-                            recorded_date = latest['시간'].strftime('%Y년 %m월 %d일 %H시 %M분')
-                            st.write(f"🕒 **최근 기록 시간:** {recorded_date}")
-                        
-                            # 레이아웃을 2열로 나누어 본인의 글과 피드백을 나란히 배치하거나 위아래로 강조
-                            col_ta, col_fb = st.columns(2)
-                            
-                            with col_ta:
-                                st.info("🙋‍♂️ **내가 쓴 반성의 글**")
-                                content = str(latest.get('반성', '작성된 내용이 없습니다.')).strip()
-                                st.write(content)
-                        
-                            with col_fb:
-                                st.success("👨‍🏫 **선생님의 피드백**")
-                                feedback = str(latest.get('피드백', '')).strip()
-                                if feedback and feedback not in ['None', 'nan', '', '0']:
-                                    st.write(feedback)
-                                else:
-                                    st.write("선생님이 확인 중이에요. 조금만 기다려주세요! ✨")
-                        
-                            # 3. [추가] 이전 기록들도 궁금할 때 (선택 사항)
-                            with st.expander("📚 지난 나의 다짐들 보기"):
-                                past_df = my_df.sort_values('시간', ascending=False)
-                                for i, row in past_df.iterrows():
-                                    st.write(f"**[{row['시간'].strftime('%m/%d')}]** {row.get('반성', '')[:50]}...")
-                        
+                                st.divider()
+                                st.subheader("📝 나의 다짐과 선생님의 한마디")
+                                latest = my_df.sort_values('시간', ascending=False).iloc[0]
+                                st.write(f"🕒 **최근 기록 시간:** {latest['시간'].strftime('%Y년 %m월 %d일 %H:%M')}")
+                                
+                                col_ta, col_fb = st.columns(2)
+                                with col_ta:
+                                    st.info("🙋‍♂️ **내가 쓴 반성의 글**")
+                                    st.write(str(latest.get('반성', '작성된 내용이 없습니다.')).strip())
+                                with col_fb:
+                                    st.success("👨‍🏫 **선생님의 피드백**")
+                                    fb_text = str(latest.get('피드백', '')).strip()
+                                    if fb_text and fb_text not in ['None', 'nan', '', '0']:
+                                        st.write(fb_text)
+                                    else:
+                                        st.write("선생님이 확인 중이에요! 조금만 기다려주세요. ✨")
+                            else:
+                                st.warning(f"'{s_name}' 학생의 {s_id}번 데이터를 찾을 수 없습니다.")
                         else:
-                            st.warning(f"'{s_name}' 학생의 {s_id}번 데이터를 찾을 수 없습니다.")
+                            st.error("열 인식 오류. '번호'나 '이름' 제목을 확인해주세요.")
+                    else:
+                        st.info("시트에 기록된 데이터가 없습니다.")
+                except Exception as e:
+                    st.error(f"시스템 오류 발생: {e}")
+
+    elif "선생님 관리" in menu:
+        st.title("🔐 선생님 관리 페이지")
+        st.info("학생 페이지 최적화 완료! 이제 관리자 기능을 구현할 차례입니다.")
