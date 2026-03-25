@@ -131,24 +131,47 @@ if sheet:
                         if len(existing_cols) > 20: col_mapping[existing_cols[20]] = '선생님피드백' # U열
                         
                         df = df.rename(columns=col_mapping)
-        
-                        # 3. 데이터 전처리 (에러 방지 핵심)
-                        # 번호: 시트 데이터가 '1'이든 '1.0'이든 무조건 정수형 문자열 '1'로 통일
-                        df['번호'] = df['번호'].apply(lambda x: str(int(float(x))) if str(x).strip() != "" else "")
-                        df['이름'] = df['이름'].str.strip() # 이름 앞뒤 공백 제거
                         
-                        # 타임스탬프 변환
+                        # 3. 데이터 전처리 (이 부분이 핵심입니다!)
+                        def clean_id(x):
+                            try:
+                                # 2.0 혹은 " 2 " 같은 값을 순수하게 "2"로 변환
+                                return str(int(float(str(x).strip())))
+                            except:
+                                return str(x).strip()
+                        
+                        df['번호'] = df['번호'].apply(clean_id)
+                        df['이름'] = df['이름'].astype(str).str.strip()
+                        
+                        # 타임스탬프 처리 (A열)
                         df['시간'] = pd.to_datetime(df['시간'], errors='coerce')
                         df = df.dropna(subset=['시간']).copy()
-        
-                        # 4. 사용자 입력값과 매칭
-                        search_id = str(int(student_id_val))
-                        search_name = student_name_val.strip()
-        
+                        
+                        # 4. 사용자 입력값도 동일하게 전처리
+                        search_id = str(int(student_id_val)) # 사용자가 입력한 번호
+                        search_name = student_name_val.strip() # 사용자가 입력한 이름
+                        
+                        # [필터링]
                         my_df = df[(df['번호'] == search_id) & (df['이름'] == search_name)].copy()
-        
+                        
                         if not my_df.empty:
                             st.success(f"✅ {search_name} 학생 확인되었습니다.")
+                            # ... 이후 그래프 출력 로직 ...
+                        else:
+                            # 5. [중요] 왜 못 찾는지 직접 확인하기 위한 디버깅용 메시지
+                            st.warning(f"'{search_name}' 학생의 {search_id}번 데이터를 찾을 수 없습니다.")
+                            
+                            with st.expander("🔍 시트 데이터와 대조해보기 (선생님 확인용)"):
+                                st.write("현재 선택한 반:", f"{selected_class}반")
+                                st.write("앱이 찾으려는 값:", f"번호: [{search_id}], 이름: [{search_name}]")
+                                
+                                # 시트의 실제 데이터 상단 5개를 보여줍니다.
+                                if not df.empty:
+                                    debug_df = df[['번호', '이름']].copy()
+                                    st.write("시트에서 읽어온 실제 값들 (상위 5개):")
+                                    st.table(debug_df.head(5))
+                                else:
+                                    st.write("시트 데이터 자체가 비어있습니다.")
                             
                             # [여기에 그래프 출력 로직이 이어집니다]
                             for cat in ['성장', '공감', '행복']:
