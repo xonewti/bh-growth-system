@@ -94,6 +94,7 @@ if sheet:
                         header = raw_data[0] 
                         df = pd.DataFrame(raw_data[1:], columns=header)
                         
+                        # 열 제목 매핑
                         new_col_map = {}
                         for original_col in df.columns:
                             clean = re.sub(r'[^가-힣a-zA-Z0-9]', '', original_col)
@@ -129,65 +130,43 @@ if sheet:
                                 for cat in ['성장', '공감', '행복']:
                                     st.subheader(f"📍 {cat} 영역 분석")
                                     l, r = st.columns(2)
-                                    with l:
-                                        fig_m = create_radar(my_df, cat, virtue_mapping, 'monthly')
-                                        if fig_m: st.plotly_chart(fig_m, use_container_width=True)
-                                    with r:
-                                        fig_w = create_radar(my_df, cat, virtue_mapping, 'weekly')
-                                        if fig_w: st.plotly_chart(fig_w, use_container_width=True)
+                                    with l: st.plotly_chart(create_radar(my_df, cat, virtue_mapping, 'monthly'), use_container_width=True)
+                                    with r: st.plotly_chart(create_radar(my_df, cat, virtue_mapping, 'weekly'), use_container_width=True)
                                 
-                            # --- [수정된 섹션] 나의 다짐과 선생님의 한마디 ---
-                            st.divider()
-                            st.subheader("📝 나의 성장 기록 히스토리")
-                            st.caption("가장 최근 기록부터 순서대로 보여집니다.")
-
-                            # 데이터 최신순 정렬
-                            history_df = my_df.sort_values('시간', ascending=False)
-
-                            # 상단 제목 영역 고정 (컬럼 사용)
-                            head_col1, head_col2 = st.columns(2)
-                            with head_col1:
-                                st.info("🙋‍♂️ **내가 쓴 반성의 글**")
-                            with head_col2:
-                                st.success("👨‍🏫 **선생님의 피드백**")
-
-                            # 전체 데이터 반복 출력
-                            for _, row in history_df.iterrows():
-                                # 시간 표시 (24시간제: %H:%M)
-                                display_time = row['시간'].strftime('%Y-%m-%d %H:%M')
+                                # --- [고정 레이아웃] 나의 성장 기록 히스토리 ---
+                                st.divider()
+                                st.subheader("📝 나의 성장 기록 히스토리")
                                 
-                                # 각 기록별 컨테이너 생성
-                                with st.container():
-                                    # 시간 표시 (텍스트 옆 상단)
-                                    st.write(f"⏱️ **기록 시간:** {display_time}")
-                                    
-                                    body_col1, body_col2 = st.columns(2)
-                                    
-                                    with body_col1:
-                                        # 반성의 글 내용
-                                        content = str(row.get('반성', '작성된 내용이 없습니다.')).strip()
-                                        st.markdown(f"""
-                                        <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; min-height: 80px;">
-                                            {content}
-                                        </div>
-                                        """, unsafe_allow_html=True)
+                                # 제목 고정
+                                h_col1, h_col2 = st.columns(2)
+                                with h_col1: st.info("🙋‍♂️ **내가 쓴 반성의 글**")
+                                with h_col2: st.success("👨‍🏫 **선생님의 피드백**")
 
-                                    with body_col2:
-                                        # 피드백 내용 (0, None, 빈칸 예외처리)
+                                history_df = my_df.sort_values('시간', ascending=False)
+                                for _, row in history_df.iterrows():
+                                    # 24시간제 시간 표시
+                                    d_time = row['시간'].strftime('%Y-%m-%d %H:%M')
+                                    st.caption(f"⏱️ 기록 시간: {d_time}")
+                                    
+                                    b_col1, b_col2 = st.columns(2)
+                                    with b_col1:
+                                        content = str(row.get('반성', '내용 없음')).strip()
+                                        st.markdown(f'<div style="background-color:#f0f2f6; padding:15px; border-radius:10px;">{content}</div>', unsafe_allow_html=True)
+                                    with b_col2:
                                         fb = str(row.get('피드백', '')).strip()
-                                        if fb and fb not in ['None', 'nan', '', '0']:
-                                            fb_display = fb
-                                        else:
-                                            fb_display = "*(선생님이 확인 중입니다)*"
-                                            
-                                        st.markdown(f"""
-                                        <div style="background-color: #e8f4ea; padding: 15px; border-radius: 10px; min-height: 80px;">
-                                            {fb_display}
-                                        </div>
-                                        """, unsafe_allow_html=True)
-                                    
-                                    st.write("") # 간격 조절용
-                                    st.divider() # 기록 간 구분선
+                                        fb_display = fb if fb and fb not in ['None', 'nan', '', '0'] else "*(확인 중)*"
+                                        st.markdown(f'<div style="background-color:#e8f4ea; padding:15px; border-radius:10px;">{fb_display}</div>', unsafe_allow_html=True)
+                                    st.write("") 
+                                    st.divider()
+                            else:
+                                st.warning(f"'{s_name}' 학생의 {s_id}번 데이터를 찾을 수 없습니다.")
+                        else:
+                            st.error("열 인식 오류")
+                    else:
+                        st.info("기록이 없습니다.")
+                except Exception as e:
+                    st.error(f"오류: {e}")
+
     elif "선생님 관리" in menu:
         st.title("🔐 선생님 관리 페이지")
-        st.info("학생 페이지 최적화 완료! 이제 관리자 기능을 구현할 차례입니다.")
+        st.info("관리 기능 구현 준비 중")
