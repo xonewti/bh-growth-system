@@ -3,11 +3,11 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime
 
-# --- 1. 학년별 설정 ---
+# --- 1. 설정 (기존 설정 유지) ---
 GRADE_CONFIG = {
-    3: {"sheet_id": "1qxJcwM6igCcB4rjChzkCQmuyx8luhO15PPtEBCtZjHw", "form_url": "https://forms.gle/o53FumajR25CRs486"},
+    3: {"sheet_id": "1qxJcwM6igCcB4rjChzkCQmuyx8luhO15PPtEBCtZjHw", "form_url": "https://forms.gle/27eJaKgW8maq3k3f8"},
     4: {"sheet_id": "YOUR_SHEET_ID_4", "form_url": "YOUR_FORM_URL_4"},
     5: {"sheet_id": "YOUR_SHEET_ID_5", "form_url": "YOUR_FORM_URL_5"},
     6: {"sheet_id": "YOUR_SHEET_ID_6", "form_url": "YOUR_FORM_URL_6"}
@@ -22,28 +22,26 @@ def connect_spreadsheet(grade):
         return client.open_by_key(GRADE_CONFIG[grade]["sheet_id"])
     except: return None
 
-@st.cache_data(ttl=300)
-def get_virtue_names(_sheet, grade):
+# [수정] 학년 조건 없이 '구분'과 '덕목이름'만 매칭
+@st.cache_data(ttl=60)
+def get_virtue_names(_sheet):
     try:
         ws = _sheet.worksheet("Settings")
         data = ws.get_all_records()
-        # 공백 제거 및 문자열 일치를 위해 strip() 사용
-        mapping = {str(r['구분']).strip(): str(r['덕목이름']).strip() for r in data if str(r['학년']) == str(grade)}
+        # 시트의 '구분' 열과 '덕목이름' 열을 직접 매칭
+        mapping = {str(r.get('구분', '')).strip(): str(r.get('덕목이름', '')).strip() for r in data}
         return mapping
     except: return {}
 
-# --- 2. 비교용 그래프 생성 함수 ---
 def create_comparison_radar(df, cat_name, virtues_dict, mode='weekly'):
     cols = [f'{cat_name}{i}' for i in range(1, 6)]
-    # Settings에 정의된 이름이 있으면 쓰고, 없으면 기본값(성장1 등) 사용
-    v_labels = [virtues_dict.get(c, c) for c in cols]
+    # Settings에서 가져온 이름표 적용
+    v_labels = [virtues_dict.get(c, c) if virtues_dict.get(c, c) != "" else c for c in cols]
     
     if df.empty: return None
-
     fig = go.Figure()
 
     if mode == 'monthly':
-        # 월간 평균 데이터
         current_month = datetime.now().month
         m_df = df[df['시간'].dt.month == current_month]
         if m_df.empty: m_df = df
@@ -51,30 +49,22 @@ def create_comparison_radar(df, cat_name, virtues_dict, mode='weekly'):
         title = f"📅 {current_month}월 나의 평균"
         color = "rgba(100, 149, 237, 0.6)"
     else:
-        # 이번 주 데이터 (최근 7일) 평균 또는 가장 최근 데이터
         recent_row = df.sort_values('시간').iloc[-1]
         r_values = [recent_row[c] for c in cols]
-        title = "🚀 이번 주의 나의 모습" # 제목 수정됨
+        title = "🚀 이번 주의 나의 모습"
         color = "rgba(255, 99, 132, 0.8)"
 
     r_values = [float(v) for v in r_values]
     r_values.append(r_values[0])
     
     fig.add_trace(go.Scatterpolar(
-        r=r_values,
-        theta=v_labels + [v_labels[0]],
-        fill='toself',
-        fillcolor=color,
+        r=r_values, theta=v_labels + [v_labels[0]],
+        fill='toself', fillcolor=color,
         line=dict(color=color.replace("0.6", "1").replace("0.8", "1")),
-        name=title
     ))
-
     fig.update_layout(
         polar=dict(radialaxis=dict(visible=True, range=[1, 5], dtick=1)),
-        title=dict(text=title, x=0.5, font=dict(size=16)),
-        height=350,
-        margin=dict(l=45, r=45, t=60, b=45),
-        showlegend=False
+        title=dict(text=title, x=0.5), height=350, showlegend=False
     )
     return fig
 
@@ -85,7 +75,8 @@ menu = st.sidebar.radio("메뉴", ["🌱 기록 및 조회", "🔐 선생님 관
 
 sheet = connect_spreadsheet(grade)
 if sheet:
-    virtue_mapping = get_virtue_names(sheet, grade)
+    # [수정] 학년 인자 제거
+    virtue_mapping = get_virtue_names(sheet)
 
     if menu == "🌱 기록 및 조회":
         st.title(f"🌱 {grade}학년 성장 기록장")
@@ -104,24 +95,30 @@ if sheet:
                 try:
                     ws = sheet.worksheet(f"{class_num}반")
                     data = ws.get_all_values()
-                    df = pd.DataFrame(data[1:], columns=data[0])
+                    header = data[0]
+                    df = pd.DataFrame(data[1:], columns=header)
                     
-                    # 열 이름 정리
+                    # [수정] T열(19번 인덱스)과 U열(20번 인덱스) 강제 지정 로직 보강
                     new_cols = {}
-                    for col in df.columns:
+                    for i, col in enumerate(header):
                         c = col.replace(" ", "").replace("[", "").replace("]", "")
                         if '타임스탬프' in c or '시간' in c: new_cols[col] = '시간'
                         if '번호' in c: new_cols[col] = '번호'
                         if '이름' in c: new_cols[col] = '이름'
-                        if '반성의글' in c or '다짐' in c: new_cols[col] = '반성의글'
-                        if '피드백' in c: new_cols[col] = '선생님피드백'
+                        # T열(20번째 열) 근처의 '반성의글' 처리
+                        if i == 19 or '반성' in c: new_cols[col] = '반성의글'
+                        # U열(21번째 열) 근처의 '피드백' 처리
+                        if i == 20 or '피드백' in c: new_cols[col] = '선생님피드백'
+                        
                         for p in ['성장', '공감', '행복']:
-                            for i in range(1, 6):
-                                if f"{p}{i}" in c: new_cols[col] = f"{p}{i}"
-                    df = df.rename(columns=new_cols)
+                            for j in range(1, 6):
+                                if f"{p}{j}" in c: new_cols[col] = f"{p}{j}"
                     
+                    df = df.rename(columns=new_cols)
                     df['시간'] = pd.to_datetime(df['시간'], errors='coerce')
+                    df = df.dropna(subset=['시간']) # 시간 없는 행 제거
                     df['번호'] = pd.to_numeric(df['번호'], errors='coerce')
+                    
                     for c in df.columns:
                         if any(p in c for p in ['성장', '공감', '행복']):
                             df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
@@ -129,39 +126,31 @@ if sheet:
                     my_df = df[(df['번호'] == student_id) & (df['이름'].str.strip() == student_name.strip())].copy()
 
                     if not my_df.empty:
-                        st.success(f"✅ {student_name} 학생의 데이터를 분석했습니다.")
-                        
-                        # 주제별 그래프 출력
+                        st.success(f"✅ {student_name} 학생 확인되었습니다.")
                         for cat in ['성장', '공감', '행복']:
                             st.subheader(f"📍 {cat} 영역 분석")
-                            left_col, right_col = st.columns(2)
-                            with left_col:
-                                fig_m = create_comparison_radar(my_df, cat, virtue_mapping, mode='monthly')
-                                if fig_m: st.plotly_chart(fig_m, use_container_width=True)
-                            with right_col:
-                                fig_r = create_comparison_radar(my_df, cat, virtue_mapping, mode='weekly')
-                                if fig_r: st.plotly_chart(fig_r, use_container_width=True)
+                            l, r = st.columns(2)
+                            with l: st.plotly_chart(create_comparison_radar(my_df, cat, virtue_mapping, 'monthly'), use_container_width=True)
+                            with r: st.plotly_chart(create_comparison_radar(my_df, cat, virtue_mapping, 'weekly'), use_container_width=True)
                             st.divider()
 
-                        # --- [추가] 반성의 글 및 선생님 피드백 ---
+                        # --- [출력] 반성의 글 & 피드백 ---
                         st.subheader("📝 나의 다짐과 선생님의 한마디")
                         recent_data = my_df.sort_values('시간', ascending=False)
                         
                         for _, row in recent_data.iterrows():
-                            # 반성의 글이나 피드백 중 하나라도 있으면 출력
-                            has_reflection = str(row.get('반성의글', '')).strip() != ""
-                            has_feedback = str(row.get('선생님피드백', '')).strip() != ""
-                            
-                            if has_reflection or has_feedback:
-                                with st.expander(f"📅 {row['시간'].strftime('%Y-%m-%d')} 기록 보기"):
-                                    if has_reflection:
-                                        st.write("**나의 다짐:**")
-                                        st.info(row['반성의글'])
-                                    if has_feedback:
-                                        st.write("**선생님의 피드백:**")
-                                        st.success(row['선생님피드백'])
-                                    elif not has_feedback:
-                                        st.write("*(선생님의 피드백을 기다리고 있어요!)*")
+                            date_str = row['시간'].strftime('%Y-%m-%d')
+                            with st.expander(f"📅 {date_str} 기록 보기", expanded=True):
+                                st.write("** 나의 다짐 (반성의 글):**")
+                                reflection = row.get('반성의글', '작성된 내용이 없습니다.')
+                                st.info(reflection if reflection else '작성된 내용이 없습니다.')
+                                
+                                feedback = str(row.get('선생님피드백', '')).strip()
+                                if feedback and feedback != 'None' and feedback != '':
+                                    st.write("** 선생님의 피드백:**")
+                                    st.success(feedback)
+                                else:
+                                    st.write("*(선생님의 피드백을 기다리고 있어요!)*")
                     else:
                         st.warning("데이터를 찾을 수 없습니다.")
                 except Exception as e:
