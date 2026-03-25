@@ -133,58 +133,58 @@ if sheet:
                             s_id, s_name = str(int(student_id_in)), student_name_in.strip()
                             my_df = df[(df['번호'] == s_id) & (df['이름'] == s_name)].copy()
 
-            # --- [나의 데이터 조회 탭] 그래프 이후 섹션 코드 ---
-            
-            if not my_df.empty:
-                st.success(f"✅ {s_name} 학생 확인되었습니다.")
-                
-                # 1. [고정] 영역별 방사형 그래프 (한 줄에 2개)
-                for cat in ['성장', '공감', '행복']:
-                    st.markdown(f"#### 📍 {cat} 영역 분석")
-                    l_col, r_col = st.columns(2)
-                    
-                    with l_col:
-                        fig_m = create_radar(my_df, cat, virtue_mapping, 'monthly')
-                        if fig_m: 
-                            st.plotly_chart(fig_m, use_container_width=True, key=f"{cat}_monthly")
-                    with r_col:
-                        fig_w = create_radar(my_df, cat, virtue_mapping, 'weekly')
-                        if fig_w: 
-                            st.plotly_chart(fig_w, use_container_width=True, key=f"{cat}_weekly")
-                
-                st.divider()
-            
-                # 2. [수정] 나의 다짐과 선생님의 한마디 (최신순 정렬)
-                st.subheader("📝 나의 다짐과 선생님의 한마디")
-                
-                # 가장 최근 기록 가져오기
-                latest = my_df.sort_values('시간', ascending=False).iloc[0]
-                
-                # 날짜 예쁘게 표시
-                recorded_date = latest['시간'].strftime('%Y년 %m월 %d일 %H시 %M분')
-                st.write(f"🕒 **최근 기록 시간:** {recorded_date}")
-            
-                # 레이아웃을 2열로 나누어 본인의 글과 피드백을 나란히 배치하거나 위아래로 강조
-                col_ta, col_fb = st.columns(2)
-                
-                with col_ta:
-                    st.info("🙋‍♂️ **내가 쓴 반성의 글**")
-                    content = str(latest.get('반성', '작성된 내용이 없습니다.')).strip()
-                    st.write(content)
-            
-                with col_fb:
-                    st.success("👨‍🏫 **선생님의 피드백**")
-                    feedback = str(latest.get('피드백', '')).strip()
-                    if feedback and feedback not in ['None', 'nan', '', '0']:
-                        st.write(feedback)
-                    else:
-                        st.write("선생님이 확인 중이에요. 조금만 기다려주세요! ✨")
-            
-                # 3. [추가] 이전 기록들도 궁금할 때 (선택 사항)
-                with st.expander("📚 지난 나의 다짐들 보기"):
-                    past_df = my_df.sort_values('시간', ascending=False)
-                    for i, row in past_df.iterrows():
-                        st.write(f"**[{row['시간'].strftime('%m/%d')}]** {row.get('반성', '')[:50]}...")
-            
-            else:
-                st.warning(f"'{s_name}' 학생의 {s_id}번 데이터를 찾을 수 없습니다.")
+                        # --- [나의 데이터 조회 탭] 그래프 이후 섹션 코드 ---
+                        
+                        if not my_df.empty:
+                            st.success(f"✅ {s_name} 학생 확인되었습니다.")
+                            
+                            # 1. [고정] 영역별 방사형 그래프 (한 줄에 2개)
+                            for cat in ['성장', '공감', '행복']:
+                                st.markdown(f"#### 📍 {cat} 영역 분석")
+                                l_col, r_col = st.columns(2)
+                                
+                                with l_col:
+                                    fig_m = create_radar(my_df, cat, virtue_mapping, 'monthly')
+                                    if fig_m: 
+                                        st.plotly_chart(fig_m, use_container_width=True, key=f"{cat}_monthly")
+                                with r_col:
+                                    fig_w = create_radar(my_df, cat, virtue_mapping, 'weekly')
+                                    if fig_w: 
+                                        st.plotly_chart(fig_w, use_container_width=True, key=f"{cat}_weekly")
+                            
+                            st.divider()
+                        
+                            # 2. [수정] 나의 다짐과 선생님의 한마디 (최신순 정렬)
+                            st.subheader("📝 나의 다짐과 선생님의 한마디")
+                            
+                            # 가장 최근 기록 가져오기
+                            latest = my_df.sort_values('시간', ascending=False).iloc[0]
+                            
+                            # 날짜 예쁘게 표시
+                            recorded_date = latest['시간'].strftime('%Y년 %m월 %d일 %H시 %M분')
+                            st.write(f"🕒 **최근 기록 시간:** {recorded_date}")
+                        
+                            # 레이아웃을 2열로 나누어 본인의 글과 피드백을 나란히 배치하거나 위아래로 강조
+                            col_ta, col_fb = st.columns(2)
+                            
+                            with col_ta:
+                                st.info("🙋‍♂️ **내가 쓴 반성의 글**")
+                                content = str(latest.get('반성', '작성된 내용이 없습니다.')).strip()
+                                st.write(content)
+                        
+                            with col_fb:
+                                st.success("👨‍🏫 **선생님의 피드백**")
+                                feedback = str(latest.get('피드백', '')).strip()
+                                if feedback and feedback not in ['None', 'nan', '', '0']:
+                                    st.write(feedback)
+                                else:
+                                    st.write("선생님이 확인 중이에요. 조금만 기다려주세요! ✨")
+                        
+                            # 3. [추가] 이전 기록들도 궁금할 때 (선택 사항)
+                            with st.expander("📚 지난 나의 다짐들 보기"):
+                                past_df = my_df.sort_values('시간', ascending=False)
+                                for i, row in past_df.iterrows():
+                                    st.write(f"**[{row['시간'].strftime('%m/%d')}]** {row.get('반성', '')[:50]}...")
+                        
+                        else:
+                            st.warning(f"'{s_name}' 학생의 {s_id}번 데이터를 찾을 수 없습니다.")
