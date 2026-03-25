@@ -1,3 +1,7 @@
+@st.cache_data(ttl=600) # 10분(600초) 동안 데이터를 메모리에 저장
+def get_settings(sheet, grade):
+    # 기존 코드 내용...
+    
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
