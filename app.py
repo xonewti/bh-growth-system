@@ -83,9 +83,12 @@ if sheet:
 
         with t2:
             c1, c2, c3 = st.columns(3)
-            with c1: class_num = st.selectbox("반", [1, 2])
-            with col_name_input := c2: student_name = st.text_input("이름")
-            with c3: student_id = st.number_input("번호", 1, 40, 1)
+            with c1: 
+                class_num = st.selectbox("반", [1, 2])
+            with c2: 
+                student_name = st.text_input("이름")
+            with c3: 
+                student_id = st.number_input("번호", 1, 40, 1)
 
             if student_name:
                 try:
