@@ -87,8 +87,7 @@ if sheet:
 
         # --- [불변 3] 기록하기 탭 ---
         with tab1:
-            st.info("### 이번 주의 나는 얼마나 성장했나요?")
-            st.write("설문지를 작성하여 나의 성장을 기록해 봅시다.")
+            st.markdown("#### 🌱 이번 주의 나는 얼마나 성장했나요? 설문지를 작성하며 나의 성장을 기록해 봅시다. 📝")
             st.link_button(f"🚀 {selected_grade}학년 {selected_class}반 기록장 열기", 
                            GRADE_CONFIG[selected_grade]["form_url"], 
                            use_container_width=True)
