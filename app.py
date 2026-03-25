@@ -8,7 +8,7 @@ from datetime import datetime
 
 # --- 1. 학년별 설정 (여기에 실제 ID와 URL을 꼭 넣어주세요!) ---
 GRADE_CONFIG = {
-    3: {"sheet_id": "3학년_시트_ID", "form_url": "3학년_설문지_URL"},
+    3: {"sheet_id": "1qxJcwM6igCcB4rjChzkCQmuyx8luhO15PPtEBCtZjHw", "form_url": "https://forms.gle/ByecMuyCb6uwv7D28"},
     4: {"sheet_id": "4학년_시트_ID", "form_url": "4학년_설문지_URL"},
     5: {"sheet_id": "5학년_시트_ID", "form_url": "5학년_설문지_URL"},
     6: {"sheet_id": "6학년_시트_ID", "form_url": "6학년_설문지_URL"}
