@@ -74,12 +74,14 @@ if sheet:
         st.title(f"🌱 {selected_grade}학년 {selected_class}반 성장 기록장")
         tab1, tab2 = st.tabs(["📝 기록하기", "📈 나의 데이터 조회"])
 
+        # --- 1. 기록하기 탭 ---
         with tab1:
             st.markdown("#### 🌱 이번 주의 나는 얼마나 성장했나요? 설문지를 작성하며 나의 성장을 기록해 봅시다. 📝")
             st.link_button(f"🚀 {selected_grade}학년 {selected_class}반 기록장 열기", 
                            GRADE_CONFIG[selected_grade]["form_url"], 
                            use_container_width=True, type="primary")
 
+        # --- 2. 나의 데이터 조회 탭 ---
         with tab2:
             c1, c2 = st.columns(2)
             with c1: student_id_in = st.number_input("번호", 1, 40, 1)
@@ -94,7 +96,7 @@ if sheet:
                         header = raw_data[0] 
                         df = pd.DataFrame(raw_data[1:], columns=header)
                         
-                        # 열 제목 매핑
+                        # 열 제목 정규화 매핑
                         new_col_map = {}
                         for original_col in df.columns:
                             clean = re.sub(r'[^가-힣a-zA-Z0-9]', '', original_col)
@@ -126,46 +128,51 @@ if sheet:
                             my_df = df[(df['번호'] == s_id) & (df['이름'] == s_name)].copy()
 
                             if not my_df.empty:
-                                # --- [날짜만 표시하도록 수정된 섹션] ---
+                                st.success(f"✅ {s_name} 학생 확인되었습니다.")
+                                
+                                # --- [1] 그래프 영역 ---
+                                for cat in ['성장', '공감', '행복']:
+                                    st.subheader(f"📍 {cat} 영역 분석")
+                                    l, r = st.columns(2)
+                                    with l:
+                                        fig_m = create_radar(my_df, cat, virtue_mapping, 'monthly')
+                                        if fig_m: st.plotly_chart(fig_m, use_container_width=True, key=f"{cat}_m_{s_id}")
+                                    with r:
+                                        fig_w = create_radar(my_df, cat, virtue_mapping, 'weekly')
+                                        if fig_w: st.plotly_chart(fig_w, use_container_width=True, key=f"{cat}_w_{s_id}")
+                                
+                                # --- [2] 히스토리 영역 (날짜만 표시) ---
                                 st.divider()
                                 st.subheader("📝 나의 성장 기록 히스토리")
                                 
-                                # 상단 제목 영역 고정
                                 h_col1, h_col2 = st.columns(2)
                                 with h_col1: st.info("🙋‍♂️ **내가 쓴 반성의 글**")
                                 with h_col2: st.success("👨‍🏫 **선생님의 피드백**")
 
-                                # 데이터 최신순 정렬
                                 history_df = my_df.sort_values('시간', ascending=False)
-                                
                                 for _, row in history_df.iterrows():
-                                    # [핵심 수정] 시간 제외, 날짜만 표시 (예: 2024-03-26)
                                     display_date = row['시간'].strftime('%Y-%m-%d')
                                     st.caption(f"📅 기록 날짜: {display_date}")
                                     
                                     b_col1, b_col2 = st.columns(2)
                                     with b_col1:
                                         content = str(row.get('반성', '내용 없음')).strip()
-                                        # 디자인 유지: 회색 박스
                                         st.markdown(f'<div style="background-color:#f0f2f6; padding:15px; border-radius:10px; min-height:60px;">{content}</div>', unsafe_allow_html=True)
-                                    
                                     with b_col2:
                                         fb = str(row.get('피드백', '')).strip()
-                                        fb_display = fb if fb and fb not in ['None', 'nan', '', '0'] else "*(선생님이 확인 중입니다)*"
-                                        # 디자인 유지: 녹색 박스
+                                        fb_display = fb if fb and fb not in ['None', 'nan', '', '0'] else "*(확인 중)*"
                                         st.markdown(f'<div style="background-color:#e8f4ea; padding:15px; border-radius:10px; min-height:60px;">{fb_display}</div>', unsafe_allow_html=True)
-                                    
                                     st.write("") 
-                                    st.divider() # 기록 간 구분선      
+                                    st.divider()
                             else:
                                 st.warning(f"'{s_name}' 학생의 {s_id}번 데이터를 찾을 수 없습니다.")
                         else:
-                            st.error("열 인식 오류")
+                            st.error("열 인식 오류: 시트의 제목을 확인해주세요.")
                     else:
-                        st.info("기록이 없습니다.")
+                        st.info("시트에 기록된 데이터가 없습니다.")
                 except Exception as e:
-                    st.error(f"오류: {e}")
+                    st.error(f"시스템 오류: {e}")
 
     elif "선생님 관리" in menu:
         st.title("🔐 선생님 관리 페이지")
-        st.info("관리 기능 구현 준비 중")
+        st.info("학생 페이지가 완성되었습니다! 이제 관리 기능을 하나씩 채워볼까요?")
