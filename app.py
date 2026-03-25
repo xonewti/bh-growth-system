@@ -154,7 +154,7 @@ if sheet:
                         else:
                             st.warning("데이터가 없습니다. 반, 번호, 이름을 다시 확인해 주세요.")
                 except Exception as e:
-                    st.error("데이터를 불러오는 중 오류가 발생했습니다. 시트 구성을 확인하세요.")
+                    st.error(f"상세 에러 내용: {e}")
 
     elif menu == "🔐 선생님 관리":
         st.title(f"🔐 {grade}학년 관리자 페이지")
