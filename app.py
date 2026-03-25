@@ -85,85 +85,96 @@ if sheet:
                            GRADE_CONFIG[selected_grade]["form_url"], 
                            use_container_width=True, type="primary")
 
-        # --- 2. 나의 데이터 조회 탭 ---
+        # --- [나의 데이터 조회] 탭 내부 매칭 로직 수정 ---
+        
         with tab2:
             c1, c2 = st.columns([1, 1])
             with c1: student_id_input = st.number_input("번호", 1, 40, 1)
             with c2: student_name_input = st.text_input("이름")
-
+        
             if student_name_input:
                 try:
                     ws = sheet.worksheet(f"{selected_class}반")
                     all_values = ws.get_all_values()
                     
                     if len(all_values) > 1:
-                        df = pd.DataFrame(all_values[1:], columns=all_values[0])
+                        # 1. 헤더에서 각 항목의 위치를 동적으로 찾기
+                        header = all_values[0]
+                        col_idx = {}
                         
-                        # 열 이름 강제 매핑 (A열: 타임스탬프 고정)
-                        col_map = {}
-                        cols = df.columns
-                        if len(cols) > 0: col_map[cols[0]] = '시간'
-                        if len(cols) > 1: col_map[cols[1]] = '반'
-                        if len(cols) > 2: col_map[cols[2]] = '번호'
-                        if len(cols) > 3: col_map[cols[3]] = '이름'
+                        for i, name in enumerate(header):
+                            clean_n = name.replace(" ", "").replace("[", "").replace("]", "")
+                            if '타임' in clean_n or '시간' in clean_n: col_idx['시간'] = i
+                            elif '번호' in clean_n: col_idx['번호'] = i
+                            elif '이름' in clean_n: col_idx['이름'] = i
+                            elif '반성' in clean_n or '다짐' in clean_n: col_idx['반성'] = i
+                            elif '피드백' in clean_n: col_idx['피드백'] = i
+                            
+                            # 영역별 점수 (성장1~5 등)
+                            for p in ['성장', '공감', '행복']:
+                                for j in range(1, 6):
+                                    if f"{p}{j}" in clean_n: col_idx[f"{p}{j}"] = i
+        
+                        # 2. 데이터프레임 생성 및 이름 재설정
+                        df = pd.DataFrame(all_values[1:], columns=header)
                         
-                        cats = ['성장', '공감', '행복']
-                        for i in range(4, 19):
-                            if len(cols) > i:
-                                c_idx, s_idx = (i-4) // 5, (i-4) % 5 + 1
-                                col_map[cols[i]] = f"{cats[c_idx]}{s_idx}"
-                        
-                        if len(cols) > 19: col_map[cols[19]] = '반성의글'
-                        if len(cols) > 20: col_map[cols[20]] = '선생님피드백'
-                        
-                        df = df.rename(columns=col_map)
-
-                        # [핵심] 데이터 전처리: 번호(2.0 -> 2) 및 이름 공백 제거
+                        # 찾은 인덱스를 바탕으로 표준 이름 부여
+                        new_col_names = {header[idx]: std_name for std_name, idx in col_idx.items()}
+                        df = df.rename(columns=new_col_names)
+        
+                        # 3. 데이터 전처리
                         def clean_id(x):
                             try: return str(int(float(str(x).strip())))
                             except: return str(x).strip()
-
-                        df['번호'] = df['번호'].apply(clean_id)
-                        df['이름'] = df['이름'].astype(str).str.strip()
-                        df['시간'] = pd.to_datetime(df['시간'], errors='coerce')
-                        df = df.dropna(subset=['시간']).copy()
-
-                        search_id = str(int(student_id_input))
-                        search_name = student_name_input.strip()
-
-                        # 필터링 실행
-                        my_df = df[(df['번호'] == search_id) & (df['이름'] == search_name)].copy()
-
-                        if not my_df.empty:
-                            st.success(f"✅ {search_name} 학생 확인되었습니다.")
+        
+                        if '번호' in df.columns and '이름' in df.columns:
+                            df['번호'] = df['번호'].apply(clean_id)
+                            df['이름'] = df['이름'].astype(str).str.strip()
                             
-                            for cat in ['성장', '공감', '행복']:
-                                st.subheader(f"📍 {cat} 영역 분석")
-                                l_col, r_col = st.columns(2)
-                                with l_col:
-                                    fig_m = create_radar(my_df, cat, virtue_mapping, 'monthly')
-                                    if fig_m: st.plotly_chart(fig_m, use_container_width=True)
-                                with r_col:
-                                    fig_w = create_radar(my_df, cat, virtue_mapping, 'weekly')
-                                    if fig_w: st.plotly_chart(fig_w, use_container_width=True)
-                            
-                            st.divider()
-                            st.subheader("📝 나의 다짐과 선생님의 한마디")
-                            latest = my_df.sort_values('시간', ascending=False).iloc[0]
-                            st.write(f"🕒 **기록 시간(타임스탬프):** {latest['시간'].strftime('%Y-%m-%d %H:%M')}")
-                            st.info(f"**나의 반성의 글:**\n{latest.get('반성의글', '내용 없음')}")
-                            
-                            fb = str(latest.get('선생님피드백', '')).strip()
-                            if fb and fb not in ['None', 'nan', '']:
-                                st.success(f"**선생님의 피드백:**\n{fb}")
+                            # 타임스탬프(시간) 변환
+                            if '시간' in df.columns:
+                                df['시간'] = pd.to_datetime(df['시간'], errors='coerce')
+                                df = df.dropna(subset=['시간']).copy()
+        
+                            search_id = str(int(student_id_input))
+                            search_name = student_name_input.strip()
+        
+                            # 4. 필터링 실행
+                            my_df = df[(df['번호'] == search_id) & (df['이름'] == search_name)].copy()
+        
+                            if not my_df.empty:
+                                st.success(f"✅ {search_name} 학생 확인되었습니다.")
+                                
+                                # [그래프 출력]
+                                for cat in ['성장', '공감', '행복']:
+                                    st.subheader(f"📍 {cat} 영역 분석")
+                                    l_col, r_col = st.columns(2)
+                                    with l_col:
+                                        fig_m = create_radar(my_df, cat, virtue_mapping, 'monthly')
+                                        if fig_m: st.plotly_chart(fig_m, use_container_width=True)
+                                    with r_col:
+                                        fig_w = create_radar(my_df, cat, virtue_mapping, 'weekly')
+                                        if fig_w: st.plotly_chart(fig_w, use_container_width=True)
+                                
+                                st.divider()
+                                st.subheader("📝 나의 다짐과 선생님의 한마디")
+                                latest = my_df.sort_values('시간', ascending=False).iloc[0]
+                                st.write(f"🕒 **기록 시간:** {latest['시간'].strftime('%Y-%m-%d %H:%M')}")
+                                st.info(f"**나의 반성의 글:**\n{latest.get('반성', '내용 없음')}")
+                                
+                                fb = str(latest.get('피드백', '')).strip()
+                                if fb and fb not in ['None', 'nan', '']:
+                                    st.success(f"**선생님의 피드백:**\n{fb}")
+                                else:
+                                    st.write("*(선생님의 피드백을 기다리고 있어요!)*")
                             else:
-                                st.write("*(선생님의 피드백을 기다리고 있어요!)*")
+                                st.warning(f"'{search_name}' 학생의 {search_id}번 데이터를 찾을 수 없습니다.")
+                                with st.expander("🔍 매칭 오류 해결 팁"):
+                                    st.write("찾으려는 값:", f"번호:[{search_id}], 이름:[{search_name}]")
+                                    st.write("인식된 열 목록:", list(df.columns))
+                                    st.write("시트 데이터 상단:", df[['번호', '이름']].head())
                         else:
-                            st.warning(f"'{search_name}' 학생의 {search_id}번 데이터를 찾을 수 없습니다.")
-                            # 매칭 실패 시 디버깅용 (성공 시 삭제 가능)
-                            with st.expander("🔍 매칭 오류 해결 팁"):
-                                st.write("입력값:", f"[{search_id}], [{search_name}]")
-                                st.write("시트 상단 데이터:", df[['번호', '이름']].head())
+                            st.error("시트에서 '번호' 또는 '이름' 열을 찾을 수 없습니다. 열 제목을 확인해주세요.")
                     else:
                         st.info("기록된 데이터가 없습니다.")
                 except Exception as e:
